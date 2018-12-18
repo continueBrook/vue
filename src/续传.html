@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <script src="../node_modules/vue/dist/vue.js"></script>
+    <script src="../node_modules/axios/dist/axios.js"></script>
+</head>
+<body>
+    <div id="app"></div>
+    <script>
+    let App = ({
+        template:`
+        <div>
+            <input type="file" @change="chooseFile"/>
+            上传进度{{rate}}%
+            <button @click="send">发送请求</button>
+            <button @click="cancel">取消请求</button>
+            <button @click="resume">续传</button>
+        </div>
+        `,
+        data(){
+            return{
+                file:{},
+                rate:0,
+                source:'',
+                loaded:'',
+                total:''
+            }
+        },
+        methods:{
+            chooseFile(event){
+                this.file = event.target.files[0];  
+            },
+            send(){
+                const CancelToken = axios.CancelToken; //api
+                const source = CancelToken.source();  //pai
+                this.source = source;  //保存这个source
+                let data = new FormData();
+                data.append('file',this.file);
+                axios.post("http://localhost:3000/api",data,{
+                    cancelToken: source.token,
+                    onUploadProgress: (progressEvent) => { //这个必须是箭头函数this的指向
+                        this.loaded = progressEvent.loaded;
+                        this.total  = progressEvent.total;
+                        this.rate = (this.loaded/this.total)*100;
+                    },
+                }).then(res => {
+                    console.log(res);
+                }).catch(err => {
+                    console.log(err);
+                })
+            },
+            cancel(){
+                this.source.cancel();
+            },
+            resume(){
+                const fileData = this.file.slice(this.loaded+1,this.file.size);
+                const CancelToken = axios.CancelToken;
+                const source = CancelToken.source();
+                this.source = source;
+                let old_loaded = this.loaded;
+                let data = new FormData();
+                data.append('file',fileData);
+                axios.post('http://localhost:3000/api',data,{
+                    cancelToken: source.token,
+                    onUploadProgress: (progressEvent) => {
+                        this.loaded = progressEvent.loaded + old_loaded;
+                        this.total  = progressEvent.total;
+                        this.rate = (this.loaded/this.total)*100;
+                    },
+                }).then(res => {
+                    console.log(res);
+                }).catch(err => {
+                    console.log(err);
+                })
+            }
+        }
+    })
+    new Vue({
+        el:'#app',
+        components:{
+            app:App
+        },
+        template:'<app/>'
+    })
+    </script>
+</body>
+</html>
